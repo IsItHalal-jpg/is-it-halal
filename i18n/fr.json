@@ -2,5 +2,6 @@
   "ask": "Demander",
   "agree": "D'accord",
   "disagree": "Pas d'accord",
-  "placeholder": "Manger du porc est-il halal ?"
+  "placeholder": "Manger du porc est-il halal ?",
+  "disclaimer_html": "Cet outil propose une classification simplifiée et ne constitue <strong>pas</strong> une fatwa. Les avis peuvent varier selon les écoles, le contexte et les savants. Consultez toujours des savants qualifiés pour un avis religieux."
 }
