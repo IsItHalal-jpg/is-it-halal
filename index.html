@@ -4,13 +4,6 @@
     <meta charset="utf-8" />
     <title>is-it-halal.com</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-    <!-- AdSense (replace ca-pub-XXXX...) -->
-    <meta name="google-adsense-account" content="ca-pub-XXXXXXXXXXXXXXX">
-    <script async
-      src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXX"
-      crossorigin="anonymous"></script>
-
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
@@ -29,29 +22,13 @@
         <div id="vote">
           <button id="agree">Agree</button>
           <button id="disagree">Disagree</button>
-          <div id="bar">
-            <div id="bar-fill"></div>
-          </div>
+          <div id="bar"><div id="bar-fill"></div></div>
           <p id="stats"></p>
         </div>
       </div>
-
-      <p id="disclaimer">
-        This tool offers a simplified classification and is not a fatwa. For religious rulings, consult qualified scholars.
-      </p>
-
-      <!-- Ad unit (replace data-ad-client/slot) -->
-      <ins class="adsbygoogle"
-           style="display:block;text-align:center"
-           data-ad-client="ca-pub-XXXXXXXXXXXXXXX"
-           data-ad-slot="1234567890"
-           data-ad-format="auto"
-           data-full-width-responsive="true"></ins>
-      <script>
-        (adsbygoogle = window.adsbygoogle || []).push({});
-      </script>
     </main>
 
-    <script src="/app.js" type="module"></script>
+    <!-- IMPORTANT: le script doit être à la fin, et en module -->
+    <script type="module" src="/app.js"></script>
   </body>
 </html>
