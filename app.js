@@ -1,7 +1,8 @@
-// Minimal i18n loader + UI actions
+// ---------- Minimal UI + robust ask() with auto-question builder + clear errors ----------
+
 const ui = {
   t: {},
-  lang: detectLang(['en','fr','es','de','ar']),
+  lang: detectLang(['en', 'fr', 'es', 'de', 'ar']),
   dir: (l) => (l === 'ar' ? 'rtl' : 'ltr'),
 };
 
@@ -27,47 +28,88 @@ q.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
 agreeBtn.addEventListener('click', () => vote('agree'));
 disagreeBtn.addEventListener('click', () => vote('disagree'));
 
-async function submit() {
-  const question = (q.value || '').trim();
-  if (!question) return;
+function log(...args) {
+  // Simple console tag to help you debug in DevTools
+  console.log('[IS-IT-HALAL]', ...args);
+}
 
+async function submit() {
+  // 1) Prepare question
+  let raw = (q.value || '').trim();
+  log('RAW INPUT:', raw);
+
+  if (!raw) {
+    alert(examplePrompt(ui.lang));
+    return;
+  }
+
+  const question = normalizeQuestion(raw, ui.lang);
+  log('NORMALIZED QUESTION:', question);
+
+  // 2) UI lock + show result box early
   lock(true);
+  resultBox.classList.remove('hidden');
   verdictEl.textContent = '…';
   explEl.textContent = '';
-  resultBox.classList.remove('hidden');
 
   try {
+    // 3) Call API
     const res = await fetch('/api/ask', {
       method: 'POST',
-      headers: { 'Content-Type':'application/json' },
-      body: JSON.stringify({ question, lang: ui.lang })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, lang: ui.lang }),
     });
+
+    if (!res.ok) {
+      const txt = await safeText(res);
+      log('ASK_ERROR_STATUS', res.status, txt);
+      verdictEl.textContent = 'Error';
+      explEl.textContent = 'Server error. Check API key or try again.';
+      return;
+    }
+
     const data = await res.json();
+    log('ASK_RESPONSE', data);
+
+    if (!data || !data.verdict || !data.explanation) {
+      verdictEl.textContent = 'Error';
+      explEl.textContent = 'Bad response from server.';
+      return;
+    }
 
     verdictEl.textContent = data.verdict;
     explEl.textContent = data.explanation;
 
-    // Load current stats
+    // 4) Load current stats for this exact question (raw text used for keying votes)
     await refreshStats(question);
-    lock(false);
   } catch (e) {
+    log('ASK_EXCEPTION', e);
     verdictEl.textContent = 'Error';
-    explEl.textContent = 'Try again later.';
+    explEl.textContent = 'Network error. Please try again.';
+  } finally {
     lock(false);
   }
 }
 
 async function vote(which) {
-  const question = (q.value || '').trim();
-  if (!question) return;
+  const raw = (q.value || '').trim();
+  if (!raw) return;
+
+  const question = normalizeQuestion(raw, ui.lang);
   lock(true);
   try {
-    await fetch('/api/vote', {
+    const res = await fetch('/api/vote', {
       method: 'POST',
-      headers: { 'Content-Type':'application/json' },
-      body: JSON.stringify({ question, vote: which })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, vote: which }),
     });
+    if (!res.ok) {
+      log('VOTE_ERROR_STATUS', res.status, await safeText(res));
+      return;
+    }
     await refreshStats(question);
+  } catch (e) {
+    log('VOTE_EXCEPTION', e);
   } finally {
     lock(false);
   }
@@ -75,7 +117,13 @@ async function vote(which) {
 
 async function refreshStats(question) {
   const res = await fetch('/api/stats?q=' + encodeURIComponent(question));
-  const { agree=0, disagree=0 } = await res.json();
+  if (!res.ok) {
+    log('STATS_ERROR_STATUS', res.status, await safeText(res));
+    statsEl.textContent = 'No stats available';
+    barFill.style.width = '0%';
+    return;
+  }
+  const { agree = 0, disagree = 0 } = await res.json();
   const total = agree + disagree;
   const pct = total ? Math.round((agree / total) * 100) : 0;
 
@@ -92,17 +140,17 @@ function lock(on) {
 }
 
 function detectLang(supported) {
-  const cand = (navigator.language || 'en').slice(0,2).toLowerCase();
+  const cand = (navigator.language || 'en').slice(0, 2).toLowerCase();
   return supported.includes(cand) ? cand : 'en';
 }
 
 async function loadI18n(lang) {
   try {
-    const resp = await fetch(`/i18n/${lang}.json`);
+    const resp = await fetch(`/i18n/${lang}.json`, { cache: 'no-store' });
     if (!resp.ok) throw new Error('missing lang');
     ui.t = await resp.json();
-  } catch (_) {
-    const resp = await fetch(`/i18n/en.json`);
+  } catch {
+    const resp = await fetch(`/i18n/en.json`, { cache: 'no-store' });
     ui.t = await resp.json();
   }
 }
@@ -116,4 +164,51 @@ function setStaticText() {
 
 function tr(key, fallback) {
   return ui.t[key] || fallback;
+}
+
+function examplePrompt(lang) {
+  const ex = {
+    en: "Please type a full question, e.g. 'Is reading the Bible halal?'",
+    fr: "Merci d’écrire une question complète, ex. « Lire la Bible est-il halal ? »",
+    es: "Escribe una pregunta completa, p. ej. «¿Leer la Biblia es halal?»",
+    de: "Bitte eine vollständige Frage eingeben, z. B. „Ist das Lesen der Bibel halal?“",
+    ar: "يرجى كتابة سؤال كامل، مثل: «هل قراءة الإنجيل حلال؟»",
+  };
+  return ex[lang] || ex.en;
+}
+
+// Build a proper question from fragments like "Reading the Bible"
+function normalizeQuestion(input, lang) {
+  const s = input.trim().replace(/\s+/g, ' ');
+  const hasQM = /\?/.test(s);
+  const hasVerbLike = /\b(is|are|est|est-ce|es|ist|هل)\b/i.test(s);
+
+  if (hasQM && hasVerbLike) return s;
+
+  // Simple language templates
+  const T = {
+    en: (x) => (x.toLowerCase().startsWith('is ') ? cap(x) : `Is ${x} halal?`),
+    fr: (x) => (/\?$/.test(x) ? x : `Est-ce que ${x} est halal ?`),
+    es: (x) => (/\?$/.test(x) ? x : `¿Es ${x} halal?`),
+    de: (x) => (/\?$/.test(x) ? x : `Ist ${x} halal?`),
+    ar: (x) => (/\?$/.test(x) ? x : `هل ${x} حلال؟`),
+  };
+
+  // If the user typed already something like "Is X halal"
+  if (/^\s*is\s.+halal/i.test(s)) return s.endsWith('?') ? s : s + '?';
+
+  const fn = T[lang] || T.en;
+  return fn(stripTrailingQM(s));
+}
+
+function stripTrailingQM(s) {
+  return s.replace(/\?+$/,'').trim();
+}
+
+function cap(s) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+async function safeText(res) {
+  try { return await res.text(); } catch { return ''; }
 }
