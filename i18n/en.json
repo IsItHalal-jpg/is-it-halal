@@ -2,5 +2,6 @@
   "ask": "Ask",
   "agree": "Agree",
   "disagree": "Disagree",
-  "placeholder": "Is eating pork halal?"
+  "placeholder": "Is eating pork halal?",
+  "disclaimer_html": "This tool offers a simplified classification and is <strong>not</strong> a fatwa. Rulings may vary by school, context and scholar. Always consult qualified scholars for religious guidance."
 }
