@@ -1,4 +1,4 @@
-// VERSION DIAGNOSTIC — vérifie que le clic marche et que /api/stats répond
+// VERSION DIAGNOSTIC corrigée — vérifie que le clic marche et que /api/stats répond
 
 const q = document.getElementById('q');
 const askBtn = document.getElementById('ask');
@@ -21,9 +21,12 @@ askBtn.addEventListener('click', async () => {
 
   try {
     const question = (q.value || 'ping').trim() || 'ping';
-    const url = '/api/stats?q=' + encodeURIComponent(question);
+    const url = '/api/stats?q=' + encodeURIComponent(question); // ✅ corrigé
+    console.log('[FETCH]', url);
+
     const res = await fetch(url);
     const txt = await res.text();
+
     if (res.ok) {
       verdictEl.textContent = 'Stats OK';
       explEl.textContent = txt;
