@@ -1,4 +1,4 @@
-// -------- is-it-halal.com — UI (Ask + Verdict color + Votes + i18n) --------
+// -------- is-it-halal.com — UI (Ask + Verdict color + Votes + i18n + localized disclaimer) --------
 
 const ui = {
   t: {},
@@ -67,8 +67,8 @@ async function submit() {
     }
 
     // Affiche le verdict + couleurs
-    verdictEl.textContent = localizeVerdict(data.verdict, ui.lang); // texte localisé
-    verdictEl.classList.add(cssClassForVerdict(data.verdict));      // couleurs par verdict EN
+    verdictEl.textContent = localizeVerdict(data.verdict, ui.lang);
+    verdictEl.classList.add(cssClassForVerdict(data.verdict));
 
     explEl.textContent = data.explanation;
 
@@ -99,9 +99,7 @@ async function vote(which) {
       body: JSON.stringify({ question, vote: which }),
     });
     await refreshStats(question);
-  } catch (e) {
-    // ignore pour l'utilisateur
-  } finally {
+  } catch {} finally {
     lock(false);
   }
 }
@@ -125,31 +123,20 @@ async function refreshStats(question) {
 
 // ----- Helpers -----
 
-function localizeVerdict(verdict, lang) {
-  if (verdict === 'Halal' || verdict === 'Haram') return verdict;
-  const byLang = {
-    fr: 'À nuancer',
-    es: 'A matizar',
-    de: 'Nuanciert zu betrachten',
-    ar: 'بحاجة إلى تفصيل',
-    en: 'To be nuanced'
-  };
+function localizeVerdict(v, lang) {
+  if (v === 'Halal' || v === 'Haram') return v;
+  const byLang = { fr: 'À nuancer', es: 'A matizar', de: 'Nuanciert zu betrachten', ar: 'بحاجة إلى تفصيل', en: 'To be nuanced' };
   return byLang[lang] || byLang.en;
 }
-
-function cssClassForVerdict(verdict) {
-  switch ((verdict || '').toLowerCase()) {
+function cssClassForVerdict(v) {
+  switch ((v || '').toLowerCase()) {
     case 'halal': return 'badge--halal';
     case 'haram': return 'badge--haram';
     default:      return 'badge--nuanced';
   }
 }
 
-function lock(on) {
-  askBtn.disabled = on;
-  agreeBtn.disabled = on;
-  disagreeBtn.disabled = on;
-}
+function lock(on) { askBtn.disabled = on; agreeBtn.disabled = on; disagreeBtn.disabled = on; }
 
 function detectLang(supported) {
   const cand = (navigator.language || 'en').slice(0, 2).toLowerCase();
@@ -172,38 +159,7 @@ function setStaticText() {
   document.getElementById('agree').textContent = tr('agree', 'Agree');
   document.getElementById('disagree').textContent = tr('disagree', 'Disagree');
   q.placeholder = tr('placeholder', 'Is eating pork halal?');
-}
 
-function tr(key, fallback) { return ui.t[key] || fallback; }
-
-function examplePrompt(lang) {
-  const ex = {
-    en: "Please type a full question, e.g. 'Is reading the Bible halal?'",
-    fr: "Merci d’écrire une question complète, ex. « Lire la Bible est-il halal ? »",
-    es: "Escribe una pregunta completa, p. ej. «¿Leer la Biblia es halal?»",
-    de: "Bitte eine vollständige Frage eingeben, z. B. „Ist das Lesen der Bibel halal?“",
-    ar: "يرجى كتابة سؤال كامل، مثل: «هل قراءة الإنجيل حلال؟»",
-  };
-  return ex[lang] || ex.en;
-}
-
-function normalizeQuestion(input, lang) {
-  const s = input.trim().replace(/\s+/g, ' ');
-  const hasQM = /\?/.test(s);
-  const hasVerbLike = /\b(is|are|est|est-ce|es|ist|هل)\b/i.test(s);
-  if (hasQM && hasVerbLike) return s;
-
-  const T = {
-    en: (x) => (x.toLowerCase().startsWith('is ') ? cap(x) : `Is ${x} halal?`),
-    fr: (x) => (/\?$/.test(x) ? x : `Est-ce que ${x} est halal ?`),
-    es: (x) => (/\?$/.test(x) ? x : `¿Es ${x} halal?`),
-    de: (x) => (/\?$/.test(x) ? x : `Ist ${x} halal?`),
-    ar: (x) => (/\?$/.test(x) ? x : `هل ${x} حلال؟`),
-  };
-  if (/^\s*is\s.+halal/i.test(s)) return s.endsWith('?') ? s : s + '?';
-  const fn = T[lang] || T.en;
-  return fn(stripTrailingQM(s));
-}
-
-function stripTrailingQM(s) { return s.replace(/\?+$/, '').trim(); }
-function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+  // Disclaimer localisé (HTML autorisé)
+  const d = document.getElementById('disclaimer');
+  d.innerHTML
