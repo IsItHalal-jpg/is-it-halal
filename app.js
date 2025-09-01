@@ -162,4 +162,42 @@ function setStaticText() {
 
   // Disclaimer localisé (HTML autorisé)
   const d = document.getElementById('disclaimer');
-  d.innerHTML
+  d.innerHTML = tr(
+    'disclaimer_html',
+    'This tool offers a simplified classification and is <strong>not</strong> a fatwa. Rulings may vary by school, context and scholar. Always consult qualified scholars for religious guidance.'
+  );
+}
+
+function tr(key, fallback) { return ui.t[key] || fallback; }
+
+function examplePrompt(lang) {
+  const ex = {
+    en: "Please type a full question, e.g. 'Is reading the Bible halal?'",
+    fr: "Merci d’écrire une question complète, ex. « Lire la Bible est-il halal ? »",
+    es: "Escribe una pregunta completa, p. ej. «¿Leer la Biblia es halal?»",
+    de: "Bitte eine vollständige Frage eingeben, z. B. „Ist das Lesen der Bibel halal?“",
+    ar: "يرجى كتابة سؤال كامل، مثل: «هل قراءة الإنجيل حلال؟»",
+  };
+  return ex[lang] || ex.en;
+}
+
+function normalizeQuestion(input, lang) {
+  const s = input.trim().replace(/\s+/g, ' ');
+  const hasQM = /\?/.test(s);
+  const hasVerbLike = /\b(is|are|est|est-ce|es|ist|هل)\b/i.test(s);
+  if (hasQM && hasVerbLike) return s;
+
+  const T = {
+    en: (x) => (x.toLowerCase().startsWith('is ') ? cap(x) : `Is ${x} halal?`),
+    fr: (x) => (/\?$/.test(x) ? x : `Est-ce que ${x} est halal ?`),
+    es: (x) => (/\?$/.test(x) ? x : `¿Es ${x} halal?`),
+    de: (x) => (/\?$/.test(x) ? x : `Ist ${x} halal?`),
+    ar: (x) => (/\?$/.test(x) ? x : `هل ${x} حلال؟`),
+  };
+  if (/^\s*is\s.+halal/i.test(s)) return s.endsWith('?') ? s : s + '?';
+  const fn = T[lang] || T.en;
+  return fn(stripTrailingQM(s));
+}
+
+function stripTrailingQM(s) { return s.replace(/\?+$/, '').trim(); }
+function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
