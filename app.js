@@ -1,4 +1,4 @@
-// -------- is-it-halal.com — UI finale (Ask + Verdict + Votes) --------
+// -------- is-it-halal.com — UI (Ask + Verdict color + Votes + i18n) --------
 
 const ui = {
   t: {},
@@ -37,16 +37,16 @@ async function submit() {
     return;
   }
 
-  // transforme "reading bible" -> "Is reading bible halal?" selon la langue
+  // ex. "reading bible" -> "Is reading bible halal?" (selon la langue)
   const question = normalizeQuestion(raw, ui.lang);
 
   lock(true);
   resultBox.classList.remove('hidden');
   verdictEl.textContent = '…';
+  verdictEl.className = 'badge'; // reset couleurs
   explEl.textContent = '';
 
   try {
-    // Appel IA
     const res = await fetch('/api/ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -66,18 +66,16 @@ async function submit() {
       return;
     }
 
-    // Affiche le verdict final
-    verdictEl.textContent = data.verdict;                  // "Halal" | "Haram" | "To be nuanced"
-    explEl.textContent = data.explanation;                 // explication courte
+    // Affiche le verdict + couleurs
+    verdictEl.textContent = localizeVerdict(data.verdict, ui.lang); // texte localisé
+    verdictEl.classList.add(cssClassForVerdict(data.verdict));      // couleurs par verdict EN
 
-    // Stats initiales pour cette question
+    explEl.textContent = data.explanation;
+
+    // Stats initiales + activer votes
     await refreshStats(question);
-
-    // Active les votes maintenant que la question est définie
     agreeBtn.disabled = false;
     disagreeBtn.disabled = false;
-
-    // Mémorise la question sur l'élément pour réutiliser lors du vote
     agreeBtn.dataset.q = question;
     disagreeBtn.dataset.q = question;
 
@@ -95,15 +93,14 @@ async function vote(which) {
 
   lock(true);
   try {
-    const res = await fetch('/api/vote', {
+    await fetch('/api/vote', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question, vote: which }),
     });
-    // Même si KV n'est pas branché, on ne bloque pas l'UI
     await refreshStats(question);
   } catch (e) {
-    // ignore pour l'utilisateur; la barre restera inchangée
+    // ignore pour l'utilisateur
   } finally {
     lock(false);
   }
@@ -127,6 +124,26 @@ async function refreshStats(question) {
 }
 
 // ----- Helpers -----
+
+function localizeVerdict(verdict, lang) {
+  if (verdict === 'Halal' || verdict === 'Haram') return verdict;
+  const byLang = {
+    fr: 'À nuancer',
+    es: 'A matizar',
+    de: 'Nuanciert zu betrachten',
+    ar: 'بحاجة إلى تفصيل',
+    en: 'To be nuanced'
+  };
+  return byLang[lang] || byLang.en;
+}
+
+function cssClassForVerdict(verdict) {
+  switch ((verdict || '').toLowerCase()) {
+    case 'halal': return 'badge--halal';
+    case 'haram': return 'badge--haram';
+    default:      return 'badge--nuanced';
+  }
+}
 
 function lock(on) {
   askBtn.disabled = on;
@@ -162,6 +179,10 @@ function tr(key, fallback) { return ui.t[key] || fallback; }
 function examplePrompt(lang) {
   const ex = {
     en: "Please type a full question, e.g. 'Is reading the Bible halal?'",
+    fr: "Merci d’écrire une question complète, ex. « Lire la Bible est-il halal ? »",
+    es: "Escribe una pregunta completa, p. ej. «¿Leer la Biblia es halal?»",
+    de: "Bitte eine vollständige Frage eingeben, z. B. „Ist das Lesen der Bibel halal?“",
+    ar: "يرجى كتابة سؤال كامل، مثل: «هل قراءة الإنجيل حلال؟»",
   };
   return ex[lang] || ex.en;
 }
@@ -170,7 +191,6 @@ function normalizeQuestion(input, lang) {
   const s = input.trim().replace(/\s+/g, ' ');
   const hasQM = /\?/.test(s);
   const hasVerbLike = /\b(is|are|est|est-ce|es|ist|هل)\b/i.test(s);
-
   if (hasQM && hasVerbLike) return s;
 
   const T = {
@@ -180,7 +200,6 @@ function normalizeQuestion(input, lang) {
     de: (x) => (/\?$/.test(x) ? x : `Ist ${x} halal?`),
     ar: (x) => (/\?$/.test(x) ? x : `هل ${x} حلال؟`),
   };
-
   if (/^\s*is\s.+halal/i.test(s)) return s.endsWith('?') ? s : s + '?';
   const fn = T[lang] || T.en;
   return fn(stripTrailingQM(s));
