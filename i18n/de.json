@@ -3,5 +3,6 @@
   "agree": "Zustimmen",
   "disagree": "Ablehnen",
   "placeholder": "Ist das Essen von Schweinefleisch halal?",
-  "disclaimer_html": "Dieses Tool liefert eine vereinfachte Einordnung und ist <strong>keine</strong> Fatwa. Urteile können je nach Rechtsschule, Kontext und Gelehrten variieren. Ziehen Sie stets qualifizierte Gelehrte zu Rate."
+  "disclaimer_html": "Dieses Tool liefert eine vereinfachte Einordnung und ist <strong>keine</strong> Fatwa. Urteile können je nach Rechtsschule, Kontext und Gelehrten variieren. Ziehen Sie stets qualifizierte Gelehrte zu Rate.",
+  "vote_recorded": "Deine Stimme wurde gezählt."
 }
