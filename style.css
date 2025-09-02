@@ -15,7 +15,6 @@ h1 { font-size: 20px; font-weight: 600; margin-bottom: 16px; }
   display:inline-block; padding:6px 10px; border:2px solid #000; border-radius:999px;
   font-weight:700; margin-top:16px; letter-spacing:.2px;
 }
-/* Couleurs selon verdict */
 .badge--halal   { background:#e7f7ec; border-color:#2da44e; color:#1a7f37; }
 .badge--haram   { background:#fde7e9; border-color:#d1242f; color:#a50e1d; }
 .badge--nuanced { background:#fff4d6; border-color:#b07e00; color:#8a6500; }
@@ -27,8 +26,16 @@ h1 { font-size: 20px; font-weight: 600; margin-bottom: 16px; }
 #vote button:disabled { opacity:.6; cursor:not-allowed; }
 
 #bar { height:10px; background:#eee; border-radius:6px; overflow:hidden; }
-#bar-fill { height:100%; width:0%; background:#000; transition:width .25s ease; }
-#stats { font-size:14px; color:#444; }
+#bar-fill { height:100%; width:0%; background:#000; transition:width .5s ease; } /* anim .5s */
+
+#stats { font-size:14px; color:#444; margin-top:6px; }
 
 #disclaimer { margin-top:24px; font-size:12px; color:#666; line-height:1.4; }
 #disclaimer strong { color:#000; }
+
+/* toast */
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+  background:#111; color:#fff; padding:10px 14px; border-radius:8px; font-size:14px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.2);
+}
