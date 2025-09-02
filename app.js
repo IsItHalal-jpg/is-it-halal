@@ -1,4 +1,4 @@
-// ------- Front-only version: verdict + simulated poll with animation -------
+// ------- Front-only version: verdict + simulated poll with soft nudge -------
 
 const ui = {
   t: {},
@@ -63,18 +63,20 @@ async function submit() {
     verdictEl.classList.add(cssClassForVerdict(data.verdict));
     explEl.textContent = data.explanation;
 
-    // Simule % d'accord selon verdict + mots-clés, puis anime
-    const pct = simulateAgreePct(question, data.verdict);
+    // % simulé (ou cache si déjà vu)
+    const cached = getCachedPct(question);
+    const pct = cached ?? simulateAgreePct(question, data.verdict);
     animateBarTo(pct);
     currentPct = pct;
     renderStats(pct);
 
-    // activer votes
-    agreeBtn.disabled = false;
-    disagreeBtn.disabled = false;
+    // gérer l'état de vote (un seul vote par question)
+    const alreadyVoted = getVoted(question);
+    agreeBtn.disabled = !!alreadyVoted;
+    disagreeBtn.disabled = !!alreadyVoted;
 
-    // stocker localement le % pour cette question (pour cohérence si on reclique)
-    localStorage.setItem(cacheKey(question), String(pct));
+    // cache pour cohérence
+    if (cached == null) setCachedPct(question, pct);
 
   } catch (e) {
     verdictEl.textContent = 'Error';
@@ -87,14 +89,28 @@ async function submit() {
 function onVote(which) {
   if (!currentQuestion) return;
 
-  // petit nudge visuel: +1% si agree, -1% si disagree (dans des bornes)
-  let pct = Number(localStorage.getItem(cacheKey(currentQuestion))) || currentPct || 50;
-  if (which === 'agree') pct = Math.min(99, pct + randInt(1,2));
-  else pct = Math.max(1, pct - randInt(1,2));
+  // empêcher le spam : un vote par question
+  if (getVoted(currentQuestion)) {
+    showToast(tr('vote_recorded', 'Your vote has been counted.'));
+    return;
+  }
+
+  // nudge très léger (0.05% à 0.30%), généralement dans le sens du clic (70%)
+  const base = getCachedPct(currentQuestion) ?? currentPct ?? 50;
+  const toward = Math.random() < 0.7 ? 1 : -1; // proba d'aller dans le sens du clic
+  const dir = (which === 'agree' ? 1 : -1) * toward;
+  const magnitude = randFloat(0.05, 0.30); // en %
+  let pct = clamp(base + dir * magnitude, 1, 99);
+
+  // arrondi à une décimale, et parfois “arrondi inverse” pour l’effet 59.9 -> 60.0
+  pct = round1(pct);
 
   animateBarTo(pct);
   currentPct = pct;
-  localStorage.setItem(cacheKey(currentQuestion), String(pct));
+  setCachedPct(currentQuestion, pct);
+  setVoted(currentQuestion, true);
+  agreeBtn.disabled = true;
+  disagreeBtn.disabled = true;
   renderStats(pct);
 
   showToast(tr('vote_recorded', 'Your vote has been counted.'));
@@ -107,7 +123,7 @@ function simulateAgreePct(question, verdict) {
   // mots qui tirent quasi-unanimité "haram"
   const hardHaram = ['pork','ham','alcohol','beer','wine','riba','usury','interest','gambling','porn'];
   // mots halal évidents
-  const hardHalal = ['water','dates','honey','zakat','charity','fasting','marriage','prayer','reading quran'];
+  const hardHalal = ['water','dates','honey','zakat','charity','fasting','marriage','prayer','reading quran','reading the quran'];
 
   // ranges % selon verdict
   let range = [55, 75]; // par défaut "To be nuanced"
@@ -118,35 +134,36 @@ function simulateAgreePct(question, verdict) {
   if (verdict === 'Haram' && hardHaram.some(w => s.includes(w))) range = [92, 98];
   if (verdict === 'Halal' && hardHalal.some(w => s.includes(w))) range = [90, 98];
 
-  // petite variabilité
   let pct = randInt(range[0], range[1]);
 
-  // cohérence par langue (rien à faire, juste commentaire)
-  return pct;
+  // petite variabilité décimale
+  pct += randFloat(-0.4, 0.4);
+  pct = clamp(pct, 1, 99);
+  return round1(pct);
 }
 
 // ---------- UI helpers ----------
 function renderStats(pct) {
-  // Texte "xx% of users agree with is-it-halal.com"
+  const p = Number(pct).toFixed(1);
   const msgByLang = {
-    en: `${pct}% of users agree with is-it-halal.com`,
-    fr: `${pct}% des utilisateurs sont d'accord avec is-it-halal.com`,
-    es: `${pct}% de usuarios están de acuerdo con is-it-halal.com`,
-    de: `${pct}% der Nutzer stimmen is-it-halal.com zu`,
-    ar: `${pct}% من المستخدمين يوافقون is-it-halal.com`,
+    en: `${p}% of users agree with is-it-halal.com`,
+    fr: `${p}% des utilisateurs sont d'accord avec is-it-halal.com`,
+    es: `${p}% de usuarios están de acuerdo con is-it-halal.com`,
+    de: `${p}% der Nutzer stimmen is-it-halal.com zu`,
+    ar: `${p}% من المستخدمين يوافقون is-it-halal.com`,
   };
   statsEl.textContent = msgByLang[ui.lang] || msgByLang.en;
 }
 
 function animateBarTo(target) {
-  const start = parseInt(barFill.style.width || '0', 10);
+  const start = parseFloat((barFill.style.width || '0').replace('%','')) || 0;
   const end = Number(target);
-  const dur = 600; // ms
+  const dur = 700; // ms
   const t0 = performance.now();
   function step(t) {
     const p = Math.min(1, (t - t0) / dur);
-    const curr = Math.round(start + (end - start) * easeOutCubic(p));
-    barFill.style.width = curr + '%';
+    const curr = (start + (end - start) * easeOutCubic(p));
+    barFill.style.width = curr.toFixed(1) + '%';
     if (p < 1) requestAnimationFrame(step);
   }
   requestAnimationFrame(step);
@@ -167,7 +184,7 @@ function cssClassForVerdict(v) {
   }
 }
 
-function lock(on){ askBtn.disabled = on; agreeBtn.disabled = on; disagreeBtn.disabled = on; }
+function lock(on){ askBtn.disabled = on; }
 
 function detectLang(supported){ const cand=(navigator.language||'en').slice(0,2).toLowerCase(); return supported.includes(cand)?cand:'en'; }
 
@@ -221,9 +238,19 @@ function normalizeQuestion(input, lang) {
   return fn(s.replace(/\?+$/,''));
 }
 
+// ----- local cache & vote lock -----
+function cacheKey(q){ return 'simvote:'+q.toLowerCase(); }
+function votedKey(q){ return 'simvote:voted:'+q.toLowerCase(); }
+function getCachedPct(q){ const v=localStorage.getItem(cacheKey(q)); return v==null?null:Number(v); }
+function setCachedPct(q,v){ localStorage.setItem(cacheKey(q), String(Number(v))); }
+function getVoted(q){ return localStorage.getItem(votedKey(q)) === '1'; }
+function setVoted(q, yes){ localStorage.setItem(votedKey(q), yes?'1':'0'); }
+
 // utils
 function randInt(a,b){ return a + Math.floor(Math.random()*(b-a+1)); }
-function cacheKey(q){ return 'simvote:'+q.toLowerCase(); }
+function randFloat(a,b){ return a + Math.random()*(b-a); }
+function round1(x){ return Math.round(x*10)/10; }
+function clamp(x,min,max){ return Math.max(min, Math.min(max, x)); }
 
 // toast
 function showToast(text){
